@@ -42,7 +42,7 @@ class Case(Base):
     )
 
     # Relationships
-    documents = relationship("Document", back_populates="case", lazy="selectin")
+    documents = relationship("Document", back_populates="case", lazy="selectin", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Case {self.case_number}: {self.title}>"

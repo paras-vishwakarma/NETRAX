@@ -31,9 +31,16 @@ router = APIRouter(prefix="/documents", tags=["Documents"])
 # Allowed MIME types
 ALLOWED_MIME_TYPES = {
     "application/pdf": ".pdf",
+    "application/x-pdf": ".pdf",
     "text/plain": ".txt",
+    "text/markdown": ".txt",
     "text/csv": ".csv",
     "application/csv": ".csv",
+    "text/x-csv": ".csv",
+    "application/vnd.ms-excel": ".csv",
+    "text/comma-separated-values": ".csv",
+    "text/tab-separated-values": ".tsv",
+    "application/octet-stream": ".bin",
 }
 
 MAX_FILENAME_LENGTH = 200
@@ -58,13 +65,18 @@ def _get_mime_type(filename: str, content_type: str | None) -> str:
     ext_to_mime = {
         ".pdf": "application/pdf",
         ".txt": "text/plain",
+        ".text": "text/plain",
+        ".md": "text/plain",
         ".csv": "text/csv",
+        ".tsv": "text/csv",
     }
     mime = ext_to_mime.get(ext)
     if mime:
         return mime
-    if content_type and content_type in ALLOWED_MIME_TYPES:
-        return content_type
+    if content_type:
+        clean_type = content_type.lower().split(";")[0].strip()
+        if clean_type in ALLOWED_MIME_TYPES:
+            return clean_type
     return content_type or "application/octet-stream"
 
 
@@ -77,15 +89,41 @@ async def _run_processing(document_id: str):
             )
             document = result.scalar_one_or_none()
             if not document:
-                logger.error(f"Document {document_id} not found for processing")
-                return
+                # Brief wait in case of async transaction delay
+                await asyncio.sleep(0.5)
+                result = await db.execute(
+                    select(Document).where(Document.id == document_id)
+                )
+                document = result.scalar_one_or_none()
+                if not document:
+                    logger.error(f"Document {document_id} not found for processing")
+                    return
 
             pipeline = get_pipeline()
             await pipeline.process(document, db)
 
+            # Auto-extract relationships and generate entity resolution candidates
+            try:
+                from app.services.resolution.relationship_extraction import RelationshipExtractionService
+                from app.services.resolution.entity_resolution import EntityResolutionService
+                from app.services.resolution.graph_sync import GraphSyncService
+
+                rel_service = RelationshipExtractionService()
+                await rel_service.extract_all(db, case_id=document.case_id, document_id=document.id)
+
+                res_service = EntityResolutionService()
+                await res_service.generate_candidates(db, case_id=document.case_id)
+
+                graph_sync = GraphSyncService()
+                await graph_sync.build_case_graph(db, document.case_id)
+
+                await db.commit()
+                logger.info(f"Relationships and graph auto-synced for document {document_id}")
+            except Exception as auto_err:
+                logger.warning(f"Auto relationship extraction / graph sync warning: {auto_err}")
+
         except Exception as e:
             logger.error(f"Background processing failed for {document_id}: {e}", exc_info=True)
-            # Try to update status to FAILED
             try:
                 result = await db.execute(
                     select(Document).where(Document.id == document_id)
@@ -136,11 +174,12 @@ async def upload_document(
 
     sanitized_filename = _sanitize_filename(file.filename)
     mime_type = _get_mime_type(sanitized_filename, file.content_type)
+    ext_suffix = Path(sanitized_filename).suffix.lower()
 
-    if mime_type not in ALLOWED_MIME_TYPES:
+    if mime_type not in ALLOWED_MIME_TYPES and ext_suffix not in {".pdf", ".txt", ".csv", ".tsv", ".md"}:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type: {mime_type}. Allowed: {list(ALLOWED_MIME_TYPES.keys())}",
+            detail=f"Unsupported file type: {mime_type}. Allowed formats: PDF, TXT, CSV",
         )
 
     # Read file content
@@ -169,13 +208,13 @@ async def upload_document(
             detail="A file with identical content has already been uploaded to this case",
         )
 
-    # Save file
+    # Save file with absolute resolved path
     file_id = str(uuid.uuid4())
-    ext = ALLOWED_MIME_TYPES[mime_type]
+    ext = ext_suffix or ALLOWED_MIME_TYPES.get(mime_type, ".pdf")
     stored_filename = f"{file_id}{ext}"
-    storage_dir = Path(settings.UPLOAD_DIR) / case_id
+    storage_dir = Path(settings.UPLOAD_DIR).resolve() / case_id
     storage_dir.mkdir(parents=True, exist_ok=True)
-    storage_path = storage_dir / stored_filename
+    storage_path = (storage_dir / stored_filename).resolve()
 
     with open(storage_path, "wb") as f:
         f.write(content)
@@ -196,7 +235,8 @@ async def upload_document(
         processing_status=ProcessingStatus.UPLOADED,
     )
     db.add(document)
-    await db.flush()
+    await db.commit()
+    await db.refresh(document)
 
     # Queue background processing
     background_tasks.add_task(_run_processing, document.id)

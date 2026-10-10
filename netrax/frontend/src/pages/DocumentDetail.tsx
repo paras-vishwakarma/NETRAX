@@ -15,6 +15,10 @@ export default function DocumentDetail() {
     queryKey: ['document', id],
     queryFn: () => getDocument(id!),
     enabled: !!id,
+    refetchInterval: (query) => {
+      const s = query.state.data?.processing_status;
+      return s && !['READY_FOR_REVIEW', 'COMPLETED', 'FAILED'].includes(s) ? 1500 : false;
+    },
   });
 
   const { data: status } = useQuery({
@@ -23,14 +27,20 @@ export default function DocumentDetail() {
     enabled: !!id,
     refetchInterval: (query) => {
       const s = query.state.data?.status;
-      return s === 'PROCESSING' || s === 'TEXT_EXTRACTED' || s === 'ENTITY_EXTRACTION' ? 2000 : false;
+      return !s || !['READY_FOR_REVIEW', 'COMPLETED', 'FAILED'].includes(s) ? 1500 : false;
     },
   });
+
+  const isCompleteOrReady =
+    status?.status === 'READY_FOR_REVIEW' ||
+    status?.status === 'COMPLETED' ||
+    doc?.processing_status === 'READY_FOR_REVIEW' ||
+    doc?.processing_status === 'COMPLETED';
 
   const { data: pages } = useQuery({
     queryKey: ['document-pages', id],
     queryFn: () => getDocumentPages(id!),
-    enabled: !!id && (status?.status === 'READY_FOR_REVIEW' || status?.status === 'COMPLETED' || status?.status === 'TEXT_EXTRACTED'),
+    enabled: !!id && (isCompleteOrReady || status?.status === 'TEXT_EXTRACTED' || doc?.processing_status === 'TEXT_EXTRACTED'),
   });
 
   if (isLoading) {
@@ -52,8 +62,12 @@ export default function DocumentDetail() {
   const isProcessing = ['PROCESSING', 'TEXT_EXTRACTED', 'ENTITY_EXTRACTION'].includes(
     status?.status || doc.processing_status
   );
-  const isReady = status?.status === 'READY_FOR_REVIEW' || status?.status === 'COMPLETED';
-  const isFailed = status?.status === 'FAILED';
+  const isReady =
+    status?.status === 'READY_FOR_REVIEW' ||
+    status?.status === 'COMPLETED' ||
+    doc.processing_status === 'READY_FOR_REVIEW' ||
+    doc.processing_status === 'COMPLETED';
+  const isFailed = status?.status === 'FAILED' || doc.processing_status === 'FAILED';
 
   const pipelineSteps = [
     { key: 'UPLOADED', label: 'Uploaded', icon: FileText },
@@ -230,8 +244,8 @@ export default function DocumentDetail() {
                     {(page.cleaned_text || page.raw_text || '').length.toLocaleString()} chars
                   </span>
                 </summary>
-                <div className="mt-2 p-4 bg-black/30 rounded-lg border border-white/5 max-h-[400px] overflow-auto">
-                  <pre className="text-sm text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">
+                <div className="mt-2 p-4 source-document-box max-h-[400px] overflow-auto">
+                  <pre className="text-sm source-document-text whitespace-pre-wrap font-mono leading-relaxed">
                     {page.cleaned_text || page.raw_text || 'No text extracted'}
                   </pre>
                 </div>

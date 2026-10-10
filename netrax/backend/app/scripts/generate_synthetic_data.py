@@ -93,12 +93,12 @@ def _generate_fir_text(fir_num: int, seed_persons: list[str]) -> str:
     org = random.choice(ORGANIZATIONS)
     email = random.choice(EMAILS)
 
-    text = f"""SYNTHETIC DEMO DATA — FOR TESTING PURPOSES ONLY
+    text = f"""SYNTHETIC DEMO DATA -- FOR TESTING PURPOSES ONLY
 ALL NAMES, NUMBERS, AND DETAILS ARE ENTIRELY FICTIONAL
 
-═══════════════════════════════════════════════════════════
+===========================================================
                     FIRST INFORMATION REPORT
-═══════════════════════════════════════════════════════════
+===========================================================
 
 FIR Number: {fir_number}
 Police Station: {station}
@@ -108,18 +108,18 @@ State: Demo State
 Date of Report: {date}
 Time of Report: {time}
 
-═══════════════════════════════════════════════════════════
-SECTION I — COMPLAINANT DETAILS
-═══════════════════════════════════════════════════════════
+===========================================================
+SECTION I -- COMPLAINANT DETAILS
+===========================================================
 
 Name: {complainant}
 Phone: {phone1}
 Email: {email}
 Address: House No. 42, {location}, Central District
 
-═══════════════════════════════════════════════════════════
-SECTION II — PERSONS MENTIONED / ACCUSED
-═══════════════════════════════════════════════════════════
+===========================================================
+SECTION II -- PERSONS MENTIONED / ACCUSED
+===========================================================
 
 """
     for i, person in enumerate(accused, 1):
@@ -131,9 +131,9 @@ SECTION II — PERSONS MENTIONED / ACCUSED
 
 """
 
-    text += f"""═══════════════════════════════════════════════════════════
-SECTION III — INCIDENT DETAILS
-═══════════════════════════════════════════════════════════
+    text += f"""===========================================================
+SECTION III -- INCIDENT DETAILS
+===========================================================
 
 Date of Incident: {date}
 Time of Incident: Approximately {time} hours
@@ -142,9 +142,9 @@ Location: {location}, near {random.choice(LOCATIONS)}
 Vehicle Involved: {vehicle}
 Organization Mentioned: {org}
 
-═══════════════════════════════════════════════════════════
-SECTION IV — NARRATIVE
-═══════════════════════════════════════════════════════════
+===========================================================
+SECTION IV -- NARRATIVE
+===========================================================
 
 On {date} at approximately {time} hours, the complainant {complainant}
 (phone: {phone1}) reported the following incident at {station}:
@@ -173,9 +173,9 @@ Account number {random.choice(ACCOUNTS)} was found linked to transactions.
 
 """
 
-    text += f"""═══════════════════════════════════════════════════════════
-SECTION V — EVIDENCE COLLECTED
-═══════════════════════════════════════════════════════════
+    text += f"""===========================================================
+SECTION V -- EVIDENCE COLLECTED
+===========================================================
 
 1. CCTV footage from {location}
 2. Call records from number {phone1}
@@ -183,9 +183,9 @@ SECTION V — EVIDENCE COLLECTED
 4. Vehicle registration details for {vehicle}
 5. Bank account records for Account No. {random.choice(ACCOUNTS)}
 
-═══════════════════════════════════════════════════════════
-SECTION VI — ACTION TAKEN
-═══════════════════════════════════════════════════════════
+===========================================================
+SECTION VI -- ACTION TAKEN
+===========================================================
 
 FIR registered under appropriate sections. Investigation initiated.
 The above report was written based on the statement of {complainant}.
@@ -194,9 +194,9 @@ Investigating Officer: IO-{random.randint(100, 999)}
 Signature: [Signed]
 Date: {date}
 
-═══════════════════════════════════════════════════════════
-            SYNTHETIC DATA — NOT A REAL DOCUMENT
-═══════════════════════════════════════════════════════════
+===========================================================
+            SYNTHETIC DATA -- NOT A REAL DOCUMENT
+===========================================================
 """
     return text
 
@@ -205,23 +205,25 @@ def _create_pdf(text: str, filepath: str):
     """Create a PDF file from text content."""
     if HAS_FITZ:
         doc = fitz.open()
-        # Split text into pages (roughly 3000 chars per page)
+        # Split text into pages (roughly 1500 chars per page to avoid overflow)
         lines = text.split('\n')
-        page_lines = []
-        current_page_text = ""
+        pages_content = []
+        current_lines = []
+        current_len = 0
 
         for line in lines:
-            test_text = current_page_text + line + "\n"
-            if len(test_text) > 3000:
-                page_lines.append(current_page_text)
-                current_page_text = line + "\n"
+            if current_len + len(line) > 1600 and current_lines:
+                pages_content.append("\n".join(current_lines))
+                current_lines = [line]
+                current_len = len(line)
             else:
-                current_page_text = test_text
+                current_lines.append(line)
+                current_len += len(line) + 1
 
-        if current_page_text:
-            page_lines.append(current_page_text)
+        if current_lines:
+            pages_content.append("\n".join(current_lines))
 
-        for page_text in page_lines:
+        for page_text in pages_content:
             page = doc.new_page(width=595, height=842)  # A4
             text_rect = fitz.Rect(50, 50, 545, 792)
             page.insert_textbox(
@@ -336,26 +338,26 @@ def generate_all_synthetic_data(output_dir: str = "data/synthetic"):
         fir_text = _generate_fir_text(i, persons)
         filepath = str(output_path / "fir" / f"FIR_{i:03d}.pdf")
         _create_pdf(fir_text, filepath)
-        print(f"  ✓ Generated {filepath}")
+        print(f"  [OK] Generated {filepath}")
 
     # Also create a TXT version of FIR 1 for testing
     fir1_text = _generate_fir_text(1, fir_person_sets[0])
     txt_path = str(output_path / "fir" / "FIR_001.txt")
     with open(txt_path, "w", encoding="utf-8") as f:
         f.write(fir1_text)
-    print(f"  ✓ Generated {txt_path}")
+    print(f"  [OK] Generated {txt_path}")
 
     # Generate 2 CDR files
     for i in range(1, 3):
         filepath = str(output_path / "cdr" / f"CDR_{i:03d}.csv")
         _generate_cdr_csv(filepath, PERSONS, PHONES)
-        print(f"  ✓ Generated {filepath}")
+        print(f"  [OK] Generated {filepath}")
 
     # Generate 2 financial files
     for i in range(1, 3):
         filepath = str(output_path / "financial" / f"transactions_{i:03d}.csv")
         _generate_financial_csv(filepath, PERSONS)
-        print(f"  ✓ Generated {filepath}")
+        print(f"  [OK] Generated {filepath}")
 
     print()
     print(f"  Total files generated: 10")

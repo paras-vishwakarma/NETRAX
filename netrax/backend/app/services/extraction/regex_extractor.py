@@ -78,7 +78,7 @@ class RegexEntityExtractor:
                         re.IGNORECASE
                     ),
                     "confidence": 0.90,
-                    "group": 0,
+                    "group": 1,
                     "description": "FIR, Case, or Transaction number",
                 },
             ],
@@ -89,7 +89,7 @@ class RegexEntityExtractor:
                         re.IGNORECASE
                     ),
                     "confidence": 0.88,
-                    "group": 0,
+                    "group": 1,
                     "description": "Bank account number",
                 },
                 {
@@ -98,7 +98,7 @@ class RegexEntityExtractor:
                         re.IGNORECASE
                     ),
                     "confidence": 0.85,
-                    "group": 0,
+                    "group": 1,
                     "description": "Bank account in tabular data",
                 },
             ],
@@ -109,7 +109,7 @@ class RegexEntityExtractor:
                         re.IGNORECASE
                     ),
                     "confidence": 0.94,
-                    "group": 0,
+                    "group": 1,
                     "description": "IMEI number",
                 },
                 {
@@ -152,7 +152,7 @@ class RegexEntityExtractor:
         Returns:
             List of ExtractedEntity objects.
         """
-        entities = []
+        raw_entities: list[ExtractedEntity] = []
 
         for entity_type, patterns in self._patterns.items():
             for pattern_config in patterns:
@@ -161,19 +161,24 @@ class RegexEntityExtractor:
                 group = pattern_config.get("group", 0)
 
                 for match in pattern.finditer(text):
-                    value = match.group(group).strip()
+                    try:
+                        value = match.group(group).strip()
+                        start = match.start(group)
+                        end = match.end(group)
+                    except (IndexError, AttributeError):
+                        value = match.group(0).strip()
+                        start = match.start(0)
+                        end = match.end(0)
+
                     if not value:
                         continue
-
-                    start = match.start(group)
-                    end = match.end(group)
 
                     # Extract surrounding context
                     context_start = max(0, start - self.CONTEXT_WINDOW)
                     context_end = min(len(text), end + self.CONTEXT_WINDOW)
                     context = text[context_start:context_end].strip()
 
-                    entities.append(ExtractedEntity(
+                    raw_entities.append(ExtractedEntity(
                         entity_type=entity_type,
                         value=value,
                         confidence=confidence,
@@ -182,6 +187,15 @@ class RegexEntityExtractor:
                         end=end,
                         context=context,
                     ))
+
+        # Deduplicate overlapping matches of the same entity type (keep highest confidence)
+        seen: dict[tuple[str, int, int], ExtractedEntity] = {}
+        for ent in raw_entities:
+            key = (ent.entity_type, ent.start, ent.end)
+            if key not in seen or ent.confidence > seen[key].confidence:
+                seen[key] = ent
+
+        entities = list(seen.values())
 
         logger.info(f"Regex extracted {len(entities)} entities from page {page_number}")
         return entities

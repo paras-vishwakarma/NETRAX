@@ -55,6 +55,37 @@ def _entity_to_response(entity: Entity) -> EntityResponse:
     )
 
 
+@router.get("", response_model=EntityListResponse)
+async def list_all_entities(
+    document_id: str | None = None,
+    case_id: str | None = None,
+    entity_type: str | None = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """List entities, optionally filtered by document_id, case_id, or entity_type."""
+    query = select(Entity).order_by(Entity.created_at.desc())
+    if document_id:
+        query = query.where(Entity.document_id == document_id)
+    if case_id:
+        query = query.join(Document, Entity.document_id == Document.id).where(Document.case_id == case_id)
+    if entity_type:
+        try:
+            etype = EntityType(entity_type.upper())
+            query = query.where(Entity.entity_type == etype)
+        except ValueError:
+            pass
+
+    result = await db.execute(query)
+    entities = result.scalars().all()
+
+    return EntityListResponse(
+        document_id=document_id or "",
+        status="COMPLETED" if entities else "NONE",
+        entities=[_entity_to_response(e) for e in entities],
+        total=len(entities),
+    )
+
+
 @router.get("/by-document/{document_id}", response_model=EntityListResponse)
 async def get_document_entities(document_id: str, db: AsyncSession = Depends(get_db)):
     """Get all entities extracted from a document."""

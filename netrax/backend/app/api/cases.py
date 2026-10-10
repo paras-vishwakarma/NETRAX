@@ -143,3 +143,83 @@ async def update_case(case_id: str, data: CaseUpdate, db: AsyncSession = Depends
         created_at=case.created_at,
         updated_at=case.updated_at,
     )
+
+
+@router.delete("/{case_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_case(case_id: str, db: AsyncSession = Depends(get_db)):
+    """Delete an investigation case and all associated documents & entities."""
+    import os
+    import shutil
+    from sqlalchemy import delete
+    from app.models.relationship import Relationship
+    from app.models.canonical_entity import CanonicalEntity, EntityAlias
+    from app.models.entity import Entity
+    from app.models.entity_match_candidate import EntityMatchCandidate
+
+    result = await db.execute(select(Case).where(Case.id == case_id))
+    case = result.scalar_one_or_none()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    # Get document IDs under this case
+    doc_results = await db.execute(select(Document).where(Document.case_id == case_id))
+    documents = doc_results.scalars().all()
+    doc_ids = [doc.id for doc in documents]
+
+    # Clean up uploaded physical files for documents under this case
+    for doc in documents:
+        if doc.storage_path and os.path.exists(doc.storage_path):
+            try:
+                os.remove(doc.storage_path)
+                parent_dir = os.path.dirname(doc.storage_path)
+                if os.path.exists(parent_dir) and not os.listdir(parent_dir):
+                    shutil.rmtree(parent_dir, ignore_errors=True)
+            except Exception:
+                pass
+
+    if doc_ids:
+        # Fetch entity IDs belonging to these documents
+        ent_results = await db.execute(select(Entity.id).where(Entity.document_id.in_(doc_ids)))
+        entity_ids = [row[0] for row in ent_results.all()]
+
+        if entity_ids:
+            # Delete EntityMatchCandidates referencing these entities
+            await db.execute(
+                delete(EntityMatchCandidate).where(
+                    (EntityMatchCandidate.entity_a_id.in_(entity_ids)) |
+                    (EntityMatchCandidate.entity_b_id.in_(entity_ids))
+                )
+            )
+
+            # Delete EntityAliases referencing these entities or documents
+            await db.execute(
+                delete(EntityAlias).where(
+                    (EntityAlias.entity_id.in_(entity_ids)) |
+                    (EntityAlias.source_document_id.in_(doc_ids))
+                )
+            )
+
+        # Delete Relationships referencing these documents or case
+        await db.execute(
+            delete(Relationship).where(
+                (Relationship.case_id == case_id) |
+                (Relationship.source_document_id.in_(doc_ids))
+            )
+        )
+    else:
+        # Delete case relationships if no docs
+        await db.execute(delete(Relationship).where(Relationship.case_id == case_id))
+
+    # Delete case (cascades to documents, pages, entities, mentions via ORM cascade)
+    await db.delete(case)
+    await db.commit()
+
+    # Clean up orphaned canonical entities with no aliases left
+    try:
+        subq = select(EntityAlias.canonical_entity_id).distinct()
+        await db.execute(delete(CanonicalEntity).where(CanonicalEntity.id.not_in(subq)))
+        await db.commit()
+    except Exception as exc:
+        pass
+
+    return None

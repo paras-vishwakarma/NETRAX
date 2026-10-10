@@ -252,6 +252,7 @@ class GraphSyncService:
                 props = json.loads(rel.properties_json) if rel.properties_json else {}
                 props["confidence"] = rel.confidence
                 props["verification_status"] = rel.verification_status.value
+                props["extraction_method"] = rel.extraction_method
                 props["source_document_id"] = rel.source_document_id
                 props["source_record_id"] = rel.source_record_id
 
@@ -317,6 +318,7 @@ class GraphSyncService:
                 props = json.loads(rel.properties_json) if rel.properties_json else {}
                 props["confidence"] = rel.confidence
                 props["verification_status"] = rel.verification_status.value
+                props["extraction_method"] = rel.extraction_method
                 all_edges.append(GraphEdge(
                     id=rel.id,
                     source=rel.source_entity_id,
@@ -340,6 +342,7 @@ class GraphSyncService:
                 props = json.loads(rel.properties_json) if rel.properties_json else {}
                 props["confidence"] = rel.confidence
                 props["verification_status"] = rel.verification_status.value
+                props["extraction_method"] = rel.extraction_method
                 all_edges.append(GraphEdge(
                     id=rel.id,
                     source=rel.source_entity_id,

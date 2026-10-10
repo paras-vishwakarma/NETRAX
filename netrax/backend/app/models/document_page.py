@@ -31,7 +31,7 @@ class DocumentPage(Base):
 
     # Relationships
     document = relationship("Document", back_populates="pages")
-    entity_mentions = relationship("EntityMention", back_populates="document_page", lazy="selectin")
+    entity_mentions = relationship("EntityMention", back_populates="document_page", lazy="selectin", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<DocumentPage doc={self.document_id} page={self.page_number}>"

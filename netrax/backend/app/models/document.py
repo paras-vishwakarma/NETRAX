@@ -70,8 +70,8 @@ class Document(Base):
 
     # Relationships
     case = relationship("Case", back_populates="documents")
-    pages = relationship("DocumentPage", back_populates="document", lazy="selectin", order_by="DocumentPage.page_number")
-    entities = relationship("Entity", back_populates="document", lazy="selectin")
+    pages = relationship("DocumentPage", back_populates="document", lazy="selectin", order_by="DocumentPage.page_number", cascade="all, delete-orphan")
+    entities = relationship("Entity", back_populates="document", lazy="selectin", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Document {self.filename} ({self.processing_status.value})>"

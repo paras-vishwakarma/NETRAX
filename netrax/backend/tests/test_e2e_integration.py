@@ -8,6 +8,7 @@ Entity extraction -> Evidence traceability -> Entity review (Verify/Reject/Edit)
 import asyncio
 import os
 import uuid
+import pytest
 from pathlib import Path
 from httpx import AsyncClient, ASGITransport
 
@@ -17,19 +18,25 @@ from app.models.document import Document, ProcessingStatus
 from app.services.processing.pipeline import get_pipeline
 
 
-async def run_end_to_end_verification():
+@pytest.mark.asyncio
+async def test_end_to_end_verification():
     print("=" * 70)
     print("  NETRA-X PHASE 1 — END-TO-END INTEGRATION TEST")
     print("=" * 70)
 
-    data_dir = Path(__file__).resolve().parent.parent.parent / "data" / "synthetic"
-    fir_file = data_dir / "fir" / "FIR_001.txt"
-    cdr_file = data_dir / "cdr" / "CDR_001.csv"
-    txn_file = data_dir / "financial" / "transactions_001.csv"
+    fir_content = """FIRST INFORMATION REPORT
+FIR Number: NX-001/2026
+Police Station: Central Kotwali Police Station
+District: Central District
 
-    assert fir_file.exists(), f"FIR test file not found at {fir_file}"
-    assert cdr_file.exists(), f"CDR test file not found at {cdr_file}"
-    assert txn_file.exists(), f"Txn test file not found at {txn_file}"
+Complainant: Rahul Sharma (phone: 9876543210, email: rahul.sharma@email.com)
+Accused: Amit Verma (phone: 9988776655)
+Vehicle Involved: CG10AB1234
+Account Number: 1234567890123
+
+Narrative:
+On 12/03/2026, complainant Rahul Sharma reported that accused Amit Verma operating vehicle CG10AB1234
+was engaged in illicit activities near Laxmi Nagar."""
 
     async with lifespan(app):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -56,18 +63,17 @@ async def run_end_to_end_verification():
             print(f"  [OK] Case Created: ID={case_id}, Number={case_data['case_number']}")
 
             # 3. Upload & Process FIR Document
-            print("\n[3/7] Uploading and processing synthetic FIR document...")
-            with open(fir_file, "rb") as f:
-                upload_resp = await client.post(
-                    "/api/documents/upload",
-                    data={
-                        "case_id": case_id,
-                        "document_type": "FIR",
-                        "source": "Central Kotwali Police Station",
-                        "description": "First Information Report regarding IPC 420/120B",
-                    },
-                    files={"file": ("FIR_001.txt", f, "text/plain")},
-                )
+            print("\n[3/7] Uploading and processing FIR document...")
+            upload_resp = await client.post(
+                "/api/documents/upload",
+                data={
+                    "case_id": case_id,
+                    "document_type": "FIR",
+                    "source": "Central Kotwali Police Station",
+                    "description": "First Information Report regarding IPC 420/120B",
+                },
+                files={"file": ("FIR_001.txt", fir_content.encode("utf-8"), "text/plain")},
+            )
             assert upload_resp.status_code == 201, f"Document upload failed: {upload_resp.text}"
             doc_data = upload_resp.json()
             doc_id = doc_data["id"]
@@ -179,4 +185,4 @@ async def run_end_to_end_verification():
 
 
 if __name__ == "__main__":
-    asyncio.run(run_end_to_end_verification())
+    asyncio.run(test_end_to_end_verification())

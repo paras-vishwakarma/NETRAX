@@ -1,28 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import cytoscape from 'cytoscape';
 import {
-  Network, RefreshCw, ZoomIn, ZoomOut, Maximize2,
+  Network, RefreshCw, ZoomIn, ZoomOut, Maximize2, Maximize, Minimize,
   Route, Download, X
 } from 'lucide-react';
 import {
   listCases, getGraph, buildGraph, findGraphPath,
   getCrossCaseConnections
 } from '../services/api';
+import NetraXGraph, { type NetraXGraphHandle, type LayoutName } from '../components/graph/NetraXGraph';
 
 export default function KnowledgeGraph() {
   const queryClient = useQueryClient();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const cyRef = useRef<cytoscape.Core | null>(null);
+  const graphRef = useRef<NetraXGraphHandle>(null);
 
   const [selectedCaseId, setSelectedCaseId] = useState<string>('');
-  const [selectedLayout, setSelectedLayout] = useState<string>('cose');
+  const [selectedLayout, setSelectedLayout] = useState<LayoutName>('force');
   const [selectedNode, setSelectedNode] = useState<any | null>(null);
   const [pathSource, setPathSource] = useState<string>('');
   const [pathTarget, setPathTarget] = useState<string>('');
   const [showPathModal, setShowPathModal] = useState<boolean>(false);
   const [showCrossCase, setShowCrossCase] = useState<boolean>(false);
   const [crossCaseData, setCrossCaseData] = useState<any[]>([]);
+  const [pathHighlight, setPathHighlight] = useState<{ nodeIds: string[]; edgeIds: string[] } | null>(null);
+  const [isFull, setIsFull] = useState<boolean>(false);
 
   // Fetch Cases
   const { data: casesData } = useQuery({
@@ -38,7 +39,7 @@ export default function KnowledgeGraph() {
   }, [casesData, selectedCaseId]);
 
   // Fetch Graph
-  const { data: graphData, isLoading: isGraphLoading, refetch: refetchGraph } = useQuery({
+  const { data: graphData, isLoading: isGraphLoading, isError: isGraphError, error: graphError, refetch: refetchGraph } = useQuery({
     queryKey: ['graph', selectedCaseId],
     queryFn: () => (selectedCaseId ? getGraph(selectedCaseId) : null),
     enabled: !!selectedCaseId,
@@ -62,17 +63,13 @@ export default function KnowledgeGraph() {
       max_depth: 5,
     }),
     onSuccess: (data) => {
-      if (data.found && cyRef.current) {
-        const nodeIds = data.path.map((n) => n.id);
-        // Highlight in Cytoscape
-        cyRef.current.elements().removeClass('highlighted');
-        nodeIds.forEach((id) => {
-          cyRef.current?.$(`#${id}`).addClass('highlighted');
-        });
-        data.edges.forEach((e) => {
-          cyRef.current?.$(`#${e.id}`).addClass('highlighted');
+      if (data.found) {
+        setPathHighlight({
+          nodeIds: data.path.map((n) => n.id),
+          edgeIds: data.edges.map((e) => e.id),
         });
       } else {
+        setPathHighlight(null);
         alert('No path found between these entities within 5 hops.');
       }
     },
@@ -90,144 +87,14 @@ export default function KnowledgeGraph() {
     }
   };
 
-  // Initialize and update Cytoscape
+  // A different case (or a rebuilt graph) invalidates any previous path highlight
   useEffect(() => {
-    if (!containerRef.current) return;
-
-    if (!graphData || !graphData.nodes || graphData.nodes.length === 0) {
-      if (cyRef.current) {
-        cyRef.current.destroy();
-        cyRef.current = null;
-      }
-      return;
-    }
-
-    const elements: cytoscape.ElementDefinition[] = [];
-
-    // Nodes
-    graphData.nodes.forEach((n) => {
-      elements.push({
-        group: 'nodes',
-        data: {
-          id: n.id,
-          label: n.label,
-          type: n.entity_type,
-          color: n.properties?.color || '#3b82f6',
-          shape: n.properties?.shape || 'ellipse',
-        },
-      });
-    });
-
-    // Edges
-    graphData.edges.forEach((e) => {
-      elements.push({
-        group: 'edges',
-        data: {
-          id: e.id,
-          source: e.source,
-          target: e.target,
-          label: e.relationship_type,
-        },
-      });
-    });
-
-    if (cyRef.current) {
-      cyRef.current.destroy();
-    }
-
-    const cy = cytoscape({
-      container: containerRef.current,
-      elements: elements,
-      style: [
-        {
-          selector: 'node',
-          style: {
-            'background-color': 'data(color)',
-            'label': 'data(label)',
-            'color': '#f8fafc',
-            'font-size': '11px',
-            'font-family': 'Inter, sans-serif',
-            'font-weight': 'bold',
-            'text-valign': 'bottom',
-            'text-margin-y': 6,
-            'text-background-color': '#0f172a',
-            'text-background-opacity': 0.8,
-            'text-background-padding': '3px',
-            'text-background-shape': 'roundrectangle',
-            'width': 36,
-            'height': 36,
-            'border-width': 2,
-            'border-color': '#ffffff30',
-          },
-        },
-        {
-          selector: 'edge',
-          style: {
-            'width': 2,
-            'line-color': '#334155',
-            'target-arrow-color': '#334155',
-            'target-arrow-shape': 'triangle',
-            'curve-style': 'bezier',
-            'label': 'data(label)',
-            'font-size': '9px',
-            'color': '#94a3b8',
-            'text-background-color': '#0b0f19',
-            'text-background-opacity': 0.85,
-            'text-background-padding': '2px',
-          },
-        },
-        {
-          selector: '.highlighted',
-          style: {
-            'background-color': '#ec4899',
-            'line-color': '#ec4899',
-            'target-arrow-color': '#ec4899',
-            'border-color': '#f43f5e',
-            'border-width': 4,
-            'width': 44,
-            'height': 44,
-          },
-        },
-        {
-          selector: 'node:selected',
-          style: {
-            'border-width': 4,
-            'border-color': '#38bdf8',
-            'border-opacity': 1,
-          },
-        },
-      ],
-      layout: {
-        name: selectedLayout,
-        animate: false,
-        padding: 50,
-      } as any,
-    });
-
-    cy.on('tap', 'node', (evt) => {
-      const node = evt.target;
-      setSelectedNode(node.data());
-    });
-
-    cy.on('tap', (evt) => {
-      if (evt.target === cy) {
-        setSelectedNode(null);
-      }
-    });
-
-    cyRef.current = cy;
-
-    return () => {
-      if (cyRef.current) {
-        cyRef.current.destroy();
-        cyRef.current = null;
-      }
-    };
-  }, [graphData, selectedLayout]);
+    setPathHighlight(null);
+  }, [selectedCaseId, graphData]);
 
   const handleExportPNG = () => {
-    if (!cyRef.current) return;
-    const png64 = cyRef.current.png({ full: true, bg: '#0a0e1a' });
+    const png64 = graphRef.current?.exportPng();
+    if (!png64) return;
     const a = document.createElement('a');
     a.href = png64;
     a.download = `knowledge_graph_${selectedCaseId.slice(0, 8)}.png`;
@@ -299,29 +166,48 @@ export default function KnowledgeGraph() {
       </div>
 
       {/* Main Canvas Area */}
-      <div className="relative glass-card border border-slate-800 rounded-xl overflow-hidden h-[680px]">
+      <NetraXGraph
+        ref={graphRef}
+        data={graphData}
+        loading={isGraphLoading || buildMutation.isPending}
+        error={isGraphError ? graphError : null}
+        onRetry={() => refetchGraph()}
+        layout={selectedLayout}
+        pathHighlight={pathHighlight}
+        hideEmptyState
+        onNodeSelect={setSelectedNode}
+        onFullscreenChange={setIsFull}
+        className="glass-card border border-slate-800 rounded-xl overflow-hidden h-[680px]"
+      >
         {/* Graph Controls Overlay */}
         <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-lg border border-slate-700/80 shadow-xl">
           <button
-            onClick={() => cyRef.current?.zoom(cyRef.current.zoom() * 1.2)}
+            onClick={() => graphRef.current?.zoomBy(1.2)}
             className="p-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white"
             title="Zoom In"
           >
             <ZoomIn className="w-4 h-4" />
           </button>
           <button
-            onClick={() => cyRef.current?.zoom(cyRef.current.zoom() * 0.8)}
+            onClick={() => graphRef.current?.zoomBy(0.8)}
             className="p-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white"
             title="Zoom Out"
           >
             <ZoomOut className="w-4 h-4" />
           </button>
           <button
-            onClick={() => cyRef.current?.fit(undefined, 40)}
+            onClick={() => graphRef.current?.fitView()}
             className="p-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white"
             title="Fit View"
           >
             <Maximize2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => graphRef.current?.toggleFullscreen()}
+            className="p-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white"
+            title={isFull ? 'Exit Fullscreen (Esc)' : 'Fullscreen'}
+          >
+            {isFull ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
           </button>
 
           <div className="w-px h-4 bg-slate-700 mx-1" />
@@ -329,32 +215,31 @@ export default function KnowledgeGraph() {
           {/* Layout Selector */}
           <select
             value={selectedLayout}
-            onChange={(e) => setSelectedLayout(e.target.value)}
+            onChange={(e) => setSelectedLayout(e.target.value as LayoutName)}
             className="bg-transparent text-xs text-slate-300 focus:outline-none pr-2"
           >
-            <option value="cose" className="bg-slate-900">CoSE Layout</option>
+            <option value="force" className="bg-slate-900">Force (stable)</option>
             <option value="concentric" className="bg-slate-900">Concentric</option>
             <option value="circle" className="bg-slate-900">Circle</option>
-            <option value="breadthfirst" className="bg-slate-900">Hierarchical</option>
             <option value="grid" className="bg-slate-900">Grid</option>
           </select>
-        </div>
 
-        {/* Legend Overlay */}
-        <div className="absolute bottom-4 left-4 z-10 flex flex-wrap items-center gap-3 bg-slate-900/90 backdrop-blur-md px-3 py-2 rounded-lg border border-slate-700/80 shadow-xl text-[11px] text-slate-300">
-          <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#3b82f6]" /> Person</div>
-          <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-[#10b981]" /> Phone</div>
-          <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-[#ef4444]" /> Account</div>
-          <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-[#06b6d4]" /> Vehicle</div>
-          <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#8b5cf6]" /> Organization</div>
-          <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rotate-45 bg-[#f59e0b]" /> Location</div>
+          {pathHighlight && (
+            <>
+              <div className="w-px h-4 bg-slate-700 mx-1" />
+              <button
+                onClick={() => setPathHighlight(null)}
+                className="px-2 py-1 rounded hover:bg-slate-800 text-[11px] text-pink-300 hover:text-pink-200 flex items-center gap-1"
+                title="Clear path highlight"
+              >
+                <X className="w-3 h-3" /> Clear path
+              </button>
+            </>
+          )}
         </div>
-
-        {/* Cytoscape Container */}
-        <div ref={containerRef} className="w-full h-full" />
 
         {/* Empty state overlay */}
-        {(!graphData || !graphData.nodes || graphData.nodes.length === 0) && !isGraphLoading && (
+        {(!graphData || !graphData.nodes || graphData.nodes.length === 0) && !isGraphLoading && !isGraphError && (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center text-slate-400 pointer-events-none">
             <Network className="w-14 h-14 text-slate-600 mb-3" />
             <h3 className="text-base font-semibold text-slate-300">No Graph Data Built Yet</h3>
@@ -377,7 +262,7 @@ export default function KnowledgeGraph() {
                 </h4>
               </div>
               <button
-                onClick={() => setSelectedNode(null)}
+                onClick={() => graphRef.current?.clearSelection()}
                 className="text-slate-400 hover:text-white p-1"
               >
                 <X className="w-4 h-4" />
@@ -410,7 +295,7 @@ export default function KnowledgeGraph() {
             </div>
           </div>
         )}
-      </div>
+      </NetraXGraph>
 
       {/* Shortest Path Modal */}
       {showPathModal && (

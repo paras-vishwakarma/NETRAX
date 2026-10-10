@@ -46,6 +46,10 @@ export async function getCase(caseId: string): Promise<Case> {
   return res.data;
 }
 
+export async function deleteCase(caseId: string): Promise<void> {
+  await api.delete(`/cases/${caseId}`);
+}
+
 // ─── Documents ────────────────────────────────────────────────────
 
 export async function uploadDocument(formData: FormData): Promise<Document> {
@@ -262,3 +266,38 @@ export async function getRecentDocuments(): Promise<Document[]> {
   const res = await api.get('/dashboard/recent-documents');
   return res.data;
 }
+
+// ─── Authentication ────────────────────────────────────────────────
+
+export interface LoginCredentials {
+  username: string;
+  password: string;
+}
+
+export interface AuthUser {
+  username: string;
+  name: string;
+  role: string;
+  badge: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  user: AuthUser;
+}
+
+export async function loginApi(credentials: LoginCredentials): Promise<LoginResponse> {
+  const res = await api.post('/auth/login', credentials);
+  return res.data;
+}
+
+export async function logoutApi(): Promise<{ status: string }> {
+  const res = await api.post('/auth/logout');
+  return res.data;
+}
+
+export async function getCurrentUserApi(): Promise<AuthUser> {
+  const res = await api.get('/auth/me');
+  return res.data;
+}
+

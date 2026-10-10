@@ -375,11 +375,11 @@ export default function EntityReview() {
 
               {/* Context */}
               {selectedMention?.context && (
-                <div className="p-4 rounded-lg bg-black/30 border border-white/5">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-600 mb-2">
+                <div className="p-4 source-document-box">
+                  <p className="text-[10px] uppercase font-bold tracking-wider text-slate-700 mb-2">
                     Extraction Context
                   </p>
-                  <p className="text-sm text-slate-300 leading-relaxed font-mono">
+                  <p className="text-sm source-document-text leading-relaxed font-mono">
                     "...{selectedMention.context}..."
                   </p>
                 </div>
@@ -387,11 +387,11 @@ export default function EntityReview() {
 
               {/* Full Page Text with Highlight */}
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-slate-600 mb-2 px-1">
+                <p className="text-[10px] uppercase font-bold tracking-wider text-slate-700 mb-2 px-1">
                   Page {selectedPage.page_number} — Full Text
                 </p>
-                <div className="p-4 bg-black/30 rounded-lg border border-white/5 max-h-[400px] overflow-auto">
-                  <pre className="text-sm text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">
+                <div className="p-4 source-document-box max-h-[400px] overflow-auto">
+                  <pre className="text-sm source-document-text whitespace-pre-wrap font-mono leading-relaxed">
                     {renderHighlightedContext(selectedPage, selectedEntity)}
                   </pre>
                 </div>
@@ -400,21 +400,21 @@ export default function EntityReview() {
               {/* All mentions */}
               {selectedEntity.mentions.length > 1 && (
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-slate-600 mb-2 px-1">
+                  <p className="text-[10px] uppercase font-bold tracking-wider text-slate-700 mb-2 px-1">
                     All Mentions ({selectedEntity.mentions.length})
                   </p>
                   <div className="space-y-2">
                     {selectedEntity.mentions.map((m) => (
-                      <div key={m.id} className="p-3 rounded-lg bg-white/[0.02] border border-white/5 text-xs">
+                      <div key={m.id} className="p-3 source-document-box text-xs">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-slate-400">Page {m.page_number}</span>
-                          <span className="text-slate-600">•</span>
-                          <span className="text-slate-400">
+                          <span className="text-slate-700 font-bold">Page {m.page_number}</span>
+                          <span className="text-slate-400">•</span>
+                          <span className="text-slate-700 font-medium">
                             {formatConfidence(m.confidence)} ({m.extraction_method})
                           </span>
                         </div>
                         {m.context && (
-                          <p className="text-slate-300 font-mono truncate">
+                          <p className="source-document-text font-mono truncate">
                             "...{m.context}..."
                           </p>
                         )}

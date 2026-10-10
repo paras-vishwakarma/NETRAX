@@ -263,14 +263,14 @@ export default function CanonicalEntities() {
                       {detailData.mentions.map((m: any, idx: number) => (
                         <div
                           key={idx}
-                          className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800/80 text-xs space-y-1"
+                          className="p-2.5 source-document-box text-xs space-y-1"
                         >
-                          <div className="flex items-center justify-between text-[10px] text-slate-500">
+                          <div className="flex items-center justify-between text-[10px] text-slate-700 font-bold">
                             <span>Page {m.page_number}</span>
                             <span>Method: {m.extraction_method}</span>
                           </div>
                           {m.context && (
-                            <p className="text-slate-300 italic font-serif">
+                            <p className="source-document-text italic font-mono text-xs">
                               &quot;{m.context}&quot;
                             </p>
                           )}

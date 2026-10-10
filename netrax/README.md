@@ -98,33 +98,46 @@ Once running, visit:
 netrax/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py              # FastAPI application
-│   │   ├── config.py            # Configuration
-│   │   ├── database.py          # Database setup
-│   │   ├── api/                 # API endpoints
-│   │   ├── models/              # SQLAlchemy models
-│   │   ├── schemas/             # Pydantic schemas
-│   │   └── services/            # Business logic
-│   │       ├── extraction/      # Text & entity extraction
-│   │       ├── nlp/             # NER services
-│   │       ├── normalization/   # Entity normalization
-│   │       └── processing/      # Document pipeline
-│   ├── tests/                   # Unit tests
-│   ├── alembic/                 # Database migrations
+│   │   ├── api/                 # FastAPI routes
+│   │   ├── models/              # SQLAlchemy persistence models
+│   │   ├── schemas/             # Pydantic request/response schemas
+│   │   ├── scripts/             # Data generation and maintenance scripts
+│   │   ├── services/
+│   │   │   ├── extraction/      # Text, OCR, and regex extraction
+│   │   │   ├── nlp/             # NER and optional LLM extraction
+│   │   │   ├── normalization/   # Text and entity normalization
+│   │   │   ├── processing/      # Document processing pipeline
+│   │   │   └── resolution/      # Entity matching and graph sync
+│   │   ├── config.py            # Environment-backed application settings
+│   │   ├── database.py          # Database engine and sessions
+│   │   └── main.py              # FastAPI application entry point
+│   ├── alembic/
+│   │   └── versions/            # Database migration revisions
+│   ├── data/synthetic/          # Synthetic backend test/demo data
+│   ├── database/                # Database-related resources
+│   ├── tests/                   # Backend unit and integration tests
+│   ├── Dockerfile
+│   ├── alembic.ini
 │   └── requirements.txt
 ├── frontend/
-│   └── src/
-│       ├── components/          # Reusable UI components
-│       ├── pages/               # Application pages
-│       ├── services/            # API client
-│       ├── hooks/               # React hooks
-│       ├── types/               # TypeScript types
-│       └── utils/               # Utilities
-├── data/synthetic/              # Synthetic test data
+│   ├── public/                  # Static frontend assets
+│   ├── src/
+│   │   ├── assets/              # Imported UI assets
+│   │   ├── pages/               # Dashboard, case, document, and graph views
+│   │   ├── services/            # Backend API client
+│   │   ├── types/               # Shared TypeScript types
+│   │   ├── utils/               # Frontend utilities
+│   │   ├── App.tsx              # Routes and application shell
+│   │   └── main.tsx             # React entry point
+│   ├── package.json
+│   └── vite.config.ts
+├── data/synthetic/              # Shared synthetic investigation data
 ├── docker-compose.yml
 ├── .env.example
 └── README.md
 ```
+
+The backend is organized by responsibility: API routes call services, services process and resolve entities, and models/schemas define persistence and API data. The frontend consumes the backend through `src/services/api.ts`. Local virtual environments, caches, databases, uploads, and build outputs are generated at runtime and are not part of the source layout.
 
 ## Key Features (Phase 1)
 
