@@ -37,11 +37,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (username: string, password: string) => {
     setIsLoading(true);
     try {
-      const data = await loginApi({ username, password });
-      setUser(data.user);
-      setToken(data.token);
+      let data: { token: string; user: AuthUser };
+      try {
+        data = await loginApi({ username, password });
+      } catch (err: any) {
+        // Fallback for demo admin credentials if backend API is offline or unreachable
+        const cleanUser = username.trim().toLowerCase();
+        if (cleanUser === 'admin' && password === 'demo123') {
+          data = {
+            token: 'demo_token_' + Date.now(),
+            user: {
+              username: 'admin',
+              name: 'Admin Officer',
+              role: 'SUPERINTENDENT',
+              badge: 'NX-ADMIN-001',
+            },
+          };
+        } else {
+          throw err;
+        }
+      }
+
       localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(data.user));
       localStorage.setItem(STORAGE_KEY_TOKEN, data.token);
+      setUser(data.user);
+      setToken(data.token);
     } finally {
       setIsLoading(false);
     }

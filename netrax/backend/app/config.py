@@ -50,8 +50,18 @@ class Settings(BaseSettings):
         return self.MAX_FILE_SIZE_MB * 1024 * 1024
 
     @property
+    def async_database_url(self) -> str:
+        """Ensure DATABASE_URL uses postgresql+asyncpg for SQLAlchemy async engine."""
+        url = self.DATABASE_URL
+        if url.startswith("postgresql://"):
+            return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        if url.startswith("postgres://"):
+            return url.replace("postgres://", "postgresql+asyncpg://", 1)
+        return url
+
+    @property
     def allowed_origins_list(self) -> list[str]:
-        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
 
     class Config:
         env_file = "../.env"

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Shield, Lock, User, Eye, EyeOff, Key,
@@ -14,11 +14,18 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const from = (location.state as any)?.from?.pathname || '/dashboard';
+
+  useEffect(() => {
+    const tokenInStorage = localStorage.getItem('netrax_token');
+    if (isAuthenticated || tokenInStorage) {
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, navigate, from]);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();

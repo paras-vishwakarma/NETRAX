@@ -20,14 +20,48 @@ import type {
   GraphSearchResult, GraphValidationResponse, GraphConnectionsResponse,
 } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+// Normalize API base URL for seamless cloud deployment (Render, Vercel, Netlify, Railway)
+let rawApiUrl = (import.meta.env.VITE_API_URL || '').trim();
+rawApiUrl = rawApiUrl.replace(/\/+$/, '');
+
+let baseURL = '/api';
+if (rawApiUrl) {
+  if (rawApiUrl.endsWith('/api')) {
+    baseURL = rawApiUrl;
+  } else {
+    baseURL = `${rawApiUrl}/api`;
+  }
+}
 
 const api = axios.create({
-  baseURL: API_BASE ? `${API_BASE}/api` : '/api',
+  baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Attach Authorization Bearer token automatically if present in localStorage
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('netrax_token');
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor for clean error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token missing or expired in real auth setup
+    }
+    return Promise.reject(error);
+  }
+);
 
 // ─── Cases ─────────────────────────────────────────────────────────
 

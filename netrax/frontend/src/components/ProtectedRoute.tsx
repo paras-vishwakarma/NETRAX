@@ -6,7 +6,11 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
   const { isAuthenticated } = useAuth();
   const location = useLocation();
 
-  if (!isAuthenticated) {
+  const tokenInStorage = localStorage.getItem('netrax_token');
+  const userInStorage = localStorage.getItem('netrax_user');
+  const isAuth = isAuthenticated || (!!tokenInStorage && !!userInStorage);
+
+  if (!isAuth) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
