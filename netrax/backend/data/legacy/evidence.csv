@@ -1,0 +1,4 @@
+evidence_id,filename,type,source,content
+EVD-001,FIR_1023_ChopShop.txt,FIR,Special Cell Delhi Police,FIR report detailing stolen Hyundai Creta DL-01-AB-4321 and suspect Vikram Sharma @ Vicky.
+EVD-002,Surveillance_Log_May2024.txt,SURVEILLANCE,Field Surveillance,Surveillance observed Rajesh Kumar receiving stolen vehicles at Chop Shop Garage Sector 12 Noida.
+EVD-003,Bank_Audit_Report.txt,FINANCIAL_RECORD,FIU Unit,FIU audit flagged illegal financial transfer from HDFC account XXXX8920 to Hawala Operator Anil Mehta.

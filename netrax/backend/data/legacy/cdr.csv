@@ -1,0 +1,4 @@
+cdr_id,caller_phone_id,receiver_phone_id,date,time,duration_seconds,location_id
+CDR-001,PHN-001,PHN-002,2024-05-10,14:30:00,240,LOC-001
+CDR-002,PHN-001,PHN-003,2024-05-11,16:15:00,180,LOC-002
+CDR-003,PHN-002,PHN-003,2024-05-12,18:45:00,310,LOC-001

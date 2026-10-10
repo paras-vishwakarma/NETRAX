@@ -20,7 +20,7 @@ import type {
   GraphSearchResult, GraphValidationResponse, GraphConnectionsResponse,
 } from '../types';
 
-// Normalize API base URL for seamless cloud deployment (Render, Vercel, Netlify, Railway)
+// Normalize API base URL for cloud deployment (Render, Vercel, Netlify, Railway)
 let rawApiUrl = (import.meta.env.VITE_API_URL || '').trim();
 rawApiUrl = rawApiUrl.replace(/\/+$/, '');
 
@@ -334,4 +334,3 @@ export async function getCurrentUserApi(): Promise<AuthUser> {
   const res = await api.get('/auth/me');
   return res.data;
 }
-
